@@ -2,7 +2,7 @@
 <plugin key="heidelberg-wallbox"
         name="Heidelberg Amperfied Wallbox"
         author="Christian"
-        version="0.9.23">
+        version="0.9.24">
     <params>
         <param field="Address" label="IP-adres wallbox" width="200px" required="true"/>
         <param field="Port" label="Modbus TCP poort" width="100px" required="true" default="502"/>
@@ -199,7 +199,7 @@ class BasePlugin:
 
     def onStart(self):
         """Start plugin and polling thread."""
-        Domoticz.Log("Wallbox plugin 0.9.23 started.")
+        Domoticz.Log("Wallbox plugin 0.9.24 started.")
 
         self.ip = Parameters["Address"]
         self.port = int(Parameters["Port"])
@@ -235,15 +235,29 @@ class BasePlugin:
         """Handle device commands."""
         dbg(f"Command: U={Unit}, C={Command}, L={Level}")
 
-        # Charging on/off
+        # Charging on/off (Wallbox - Laden)
         if Unit == 16:
+            pauze_actief = (19 in Devices and Devices[19].nValue == 1)
+
             if Command == "Off":
+                # UI en state altijd uit
+                self.updateDevice(16, 0, "Off")
                 self.writeRegister(261, 0)
+
                 self.laden_was_actief = False
                 set_state(self.state, "WB_laden_was_actief", 0)
+
             else:
+                # UI altijd aan, ook als Pauze actief
+                self.updateDevice(16, 1, "On")
+
                 waarde = self._calculate_charge_current()
-                self.writeRegister(261, waarde)
+
+                # Alleen naar 261 schrijven als Pauze UIT is
+                if not pauze_actief:
+                    self.writeRegister(261, waarde)
+                else:
+                    dbg("Laden aan gezet terwijl Pauze actief is → 261 blijft 0")
 
                 level = max(0, min(100, waarde - 60)) if waarde >= 60 else 0
                 self.saved_level = level
@@ -331,7 +345,7 @@ class BasePlugin:
             if selector in self.preset_map:
                 waarde = self.preset_map[selector]
 
-                # *** FIX: alleen schrijven als laden aan staat ***
+                # alleen schrijven als laden aan staat
                 if Devices[16].nValue == 1:
                     self.writeRegister(261, waarde)
 
@@ -340,9 +354,10 @@ class BasePlugin:
                 self.updateDevice(14, 1 if level > 0 else 0, str(level))
                 set_state(self.state, "WB_slider_level", self.saved_level)
 
+        # Pauze
         elif Unit == 19:
             if Command == "On":
-                # Pauze aan → 261 = 0, maar Laden blijft AAN
+                # Pauze aan → 261 = 0, Laden‑schakelaar NIET bedienen
                 self.updateDevice(19, 1, "On")
                 self.writeRegister(261, 0)
 
@@ -482,11 +497,10 @@ class BasePlugin:
         """One-time startup recovery from persistent state."""
         dbg("StartupRecovery: begin")
         
-        # Pauze actief → altijd 261 = 0, maar Laden blijft aan
+        # Pauze actief → altijd 261 = 0, Laden‑schakelaar NIET bedienen
         if 19 in Devices and Devices[19].nValue == 1:
-            dbg("StartupRecovery: Pauze actief → 261=0, Laden blijft aan")
+            dbg("StartupRecovery: Pauze actief → 261=0, Laden‑schakelaar blijft zoals hij is")
             self.writeRegister(261, 0)
-            self.updateDevice(16, 1, "On")
             self.startup_recovery_done = True
             return
 
@@ -646,17 +660,18 @@ class BasePlugin:
             inst_amp = val_261 / 10.0
             self.updateDevice(17, 0, f"{inst_amp:.1f}")
 
-            # Sync charging device with register 261 with pauze override
-            if 19 in Devices and Devices[19].nValue == 1:
-                # Pauze actief → 261 moet 0 zijn
+            pauze_actief = (19 in Devices and Devices[19].nValue == 1)
+
+            # Pauze actief → 261 moet 0 zijn, maar Wallbox - Laden NIET bedienen
+            if pauze_actief:
                 if val_261 != 0:
                     self.writeRegister(261, 0)
-                self.updateDevice(16, 1, "On")  # Laden blijft aan
+                # Geen updateDevice(16, ...) hier: Pauze mag Laden niet sturen
             else:
-                # Normale sync
+                # Normale sync van Wallbox - Laden met 261
                 is_charging = val_261 > 59
-                self.updateDevice(16, 1 if is_charging else 0, "On" if is_charging else "Off")
-
+                self.updateDevice(16, 1 if is_charging else 0,
+                                  "On" if is_charging else "Off")
 
             # Communication OK
             self.updateDevice(15, 1, "On")
@@ -665,7 +680,7 @@ class BasePlugin:
             self.updateSelectorFrom261(val_261)
 
             # Pauze actief → slider UI NIET aanpassen
-            if 19 in Devices and Devices[19].nValue == 1:
+            if pauze_actief:
                 dbg("Slider UI sync overgeslagen: Pauze actief")
             else:
                 level = max(0, min(100, val_261 - 60)) if val_261 >= 60 else 0
@@ -695,6 +710,7 @@ class BasePlugin:
         except Exception as e:
             Domoticz.Error(f"Write error reg {reg}: {e}")
 
+
 global _plugin
 _plugin = BasePlugin()
 
@@ -713,3 +729,4 @@ def onCommand(Unit, Command, Level, Color):
 
 def onHeartbeat():
     """Domoticz heartbeat callback (unused)."""
+    pass
