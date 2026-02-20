@@ -1,6 +1,9 @@
 CHANGELOG — Heidelberg Amperfied Wallbox Domoticz Plugin
 Auteur: Xtremernl
 
+Versie 0.9.24
+- Fix: Pauze‑schakelaar beïnvloedde onterecht de “Wallbox – Laden” schakelaar
+
 Versie 0.9.23
 - Fix: wijzigen van een preset (selector) zet de laadpaal niet langer automatisch aan.
 - Verbetering: als de slider wordt gebruikt terwijl een preset actief was, schakelt de plugin automatisch terug naar dynamisch laden.
