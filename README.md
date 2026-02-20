@@ -45,33 +45,33 @@ Failsafe stroom: 0 of 60–160 (0.1A stappen)
 Polling interval: minimaal 1 seconde
 Debug-modus: extra logging
 
-Aangemaakte devices (v0.9.23)
-Unit 1: Status (tekst, status 2–11)
-Unit 2–4: Stroom L1–L3 (0.1A)
-Unit 5: PCB temperatuur (0.1°C)
-Unit 6–8: Spanning L1–L3 (Volt)
-Unit 9: Externe vergrendeling (0=Locked / 1=Released)
-Unit 10: Vermogen + Energie (W + kWh)
-Unit 11: Max HW stroom
-Unit 12: Min HW stroom
-Unit 13: Afstandsvergrendeling (reg 259)
-Unit 14: Laadstroom slider (0–100% → 60–160)
-Unit 15: Communicatie (On/Off)
-Unit 16: Laden (Aan/Uit)
-Unit 17: Ingestelde laadstroom (261/10)
-Unit 18: Preset laadstroom (Dynamisch / 6A / 8A / 10A / 13A / 16A)
-Unit 19: Pauze (override: 261=0, laden blijft aan)
+Aangemaakte devices.
+- Unit 1: Status (tekst, status 2–11)
+- Unit 2–4: Stroom L1–L3 (0.1A)
+- Unit 5: PCB temperatuur (0.1°C)
+- Unit 6–8: Spanning L1–L3 (Volt)
+- Unit 9: Externe vergrendeling (0=Locked / 1=Released)
+- Unit 10: Vermogen + Energie (W + kWh)
+- Unit 11: Max HW stroom
+- Unit 12: Min HW stroom
+- Unit 13: Afstandsvergrendeling (reg 259)
+- Unit 14: Laadstroom slider (0–100% → 60–160)
+- Unit 15: Communicatie (On/Off)
+- Unit 16: Laden (Aan/Uit)
+- Unit 17: Ingestelde laadstroom (261/10)
+- Unit 18: Preset laadstroom (Dynamisch / 6A / 8A / 10A / 13A / 16A)
+- Unit 19: Pauze (override: 261=0, laden blijft aan)
 
 Belangrijke registers
-257: Watchdog
-258: Standby (0=Aan / 4=Uit)
-259: Remote lock (0=On / 1=Off)
-261: Laadstroom setpoint (0 of 60–160)
-262: Failsafe
-5–14: Status, stromen, temp, spanningen, vermogen
-17–18: Energie (32‑bit)
-100–101: Max/min HW stroom
-
+- 257: Watchdog
+- 258: Standby (0=Aan / 4=Uit)
+- 259: Remote lock (0=On / 1=Off)
+- 261: Laadstroom setpoint (0 of 60–160)
+- 262: Failsafe
+- 5–14: Status, stromen, temp, spanningen, vermogen
+- 17–18: Energie (32‑bit)
+- 100–101: Max/min HW stroom
+- 
 Laadstroom‑logica (v0.9.23)
 - Laden aan/uit (Unit 16)
 Uit → schrijf 0 naar register 261
@@ -125,15 +125,3 @@ Geen verbinding → IP/poort fout → test met telnet <ip> 502
 Illegal data address → te grote Modbus‑read → plugin gebruikt veilige blokken
 Slider springt naar 0 → Pauze actief → correct gedrag
 Preset start laden → Laden stond aan → correct gedrag
-
-Wat is nieuw in v0.9.23
-Toegevoegd: Pauze (Unit 19)
-Pauze override: 261=0, Laden blijft aan
-Slider‑UI blijft staan tijdens Pauze
-Slider schakelt preset automatisch uit
-Preset schrijft alleen naar 261 als laden aan staat
-Volledig herschreven UI‑sync
-Verbeterde startupRecovery
-Verbeterde state‑consistentie
-Geen externe Modbus‑libraries meer nodig
-Geen automatisering in de plugin (alles in Domoticz scripts)
