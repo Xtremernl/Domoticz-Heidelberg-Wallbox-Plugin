@@ -8,17 +8,20 @@ Versie 0.9.23
 - Verbetering: selector‑ en slider‑sync verder verfijnd.
 - Verbetering: robuustere state‑opslag en herstelgedrag.
 - Kleine optimalisaties en code‑cleanup.
+
 Versie 0.9.22
 - Toegevoegd: slider‑wijziging forceert terug naar dynamisch laden wanneer een preset actief was.
 - Verbetering: pauze‑modus blokkeert nu correct alle preset‑ en slider‑acties richting register 261.
 - Verbetering: UI‑sync van slider wordt overgeslagen tijdens pauze.
 - Verbetering: selector‑sync verbeterd.
 - Diverse stabiliteitsverbeteringen.
+
 Versie 0.9.21
 - Verbetering: selector‑ en slider‑logica verder opgeschoond.
 - Verbetering: pauze‑modus uitgebreid en betrouwbaarder gemaakt.
 - Verbetering: state‑herstel verbeterd.
 - Kleine bugfixes.
+
 Versie 0.9.20
 - Grote update: volledige herstructurering van startup‑recovery.
 - Nieuw: laden_was_actief wordt opgeslagen en gebruikt voor herstel na Domoticz‑restart.
@@ -28,9 +31,11 @@ Versie 0.9.20
 - Verbetering: pauze‑modus toegevoegd (Unit 19).
 - Verbetering: UI‑sync van slider en selector volledig herschreven.
 - Diverse bugfixes en stabiliteitsverbeteringen.
+
 Versie 0.9.14
 - Code cleanup.
 - Geen functionele wijzigingen.
+
 Versie 0.9.13
 - Verbetering: selector‑ en slider‑sync volledig herschreven.
 - Nieuw: startup‑recovery op basis van JSON‑state.
@@ -38,6 +43,7 @@ Versie 0.9.13
 - Verbetering: laden_was_actief wordt nu correct opgeslagen en hersteld.
 - Verbetering: UI‑sync van selector en slider verbeterd.
 - Diverse bugfixes.
+
 Versie 0.9.11
 - Toegevoegd: lokale JSON‑state voor selector, slider, status en laden_was_actief.
 - Nieuw: herstel na Domoticz‑restart op basis van opgeslagen state.
@@ -45,6 +51,7 @@ Versie 0.9.11
 - Verbetering: slider‑settle logica.
 - Verbetering: robuustere Modbus‑foutafhandeling.
 - Diverse verbeteringen en fixes.
+
 Versie 0.9.10
 - Eerste stabiele versie met volledige Modbus‑implementatie.
 - Toegevoegd: selector presets (6A, 8A, 10A, 13A, 16A).
