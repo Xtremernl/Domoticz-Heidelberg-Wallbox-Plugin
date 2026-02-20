@@ -1,5 +1,4 @@
 # Heidelberg Amperfied Wallbox — Domoticz Plugin
-Versie 0.9.23
 
 Beschrijving
 Deze Domoticz‑plugin integreert de HEIDELBERG Amperfied Wallbox Energy Control (firmware v1.0.8) met Domoticz.
