@@ -1,6 +1,12 @@
 CHANGELOG — Heidelberg Amperfied Wallbox Domoticz Plugin
 Auteur: Xtremernl
 
+0.9.25 – interne stabiliteitsrelease
+• 	Volledige herbouw van de laadlogica: UI‑leidend, geen poll‑interferentie.
+• 	Verbeterde selector/slider‑consistentie en correcte UI‑feedback.
+• 	Deterministische 261‑aansturing en stabiele startupRecovery.
+• 	Geen wijzigingen aan de gebruikersinterface of installatieprocedure.
+
 Versie 0.9.24
 - Fix: Pauze‑schakelaar beïnvloedde onterecht de “Wallbox – Laden” schakelaar
 
