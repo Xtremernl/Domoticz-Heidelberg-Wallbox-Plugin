@@ -2,7 +2,7 @@
 <plugin key="heidelberg-wallbox"
         name="Heidelberg Amperfied Wallbox"
         author="Christian"
-        version="0.9.24">
+        version="0.9.25">
     <params>
         <param field="Address" label="IP-adres wallbox" width="200px" required="true"/>
         <param field="Port" label="Modbus TCP poort" width="100px" required="true" default="502"/>
@@ -199,7 +199,7 @@ class BasePlugin:
 
     def onStart(self):
         """Start plugin and polling thread."""
-        Domoticz.Log("Wallbox plugin 0.9.24 started.")
+        Domoticz.Log("Wallbox plugin 0.9.25 started.")
 
         self.ip = Parameters["Address"]
         self.port = int(Parameters["Port"])
@@ -235,55 +235,28 @@ class BasePlugin:
         """Handle device commands."""
         dbg(f"Command: U={Unit}, C={Command}, L={Level}")
 
-        # Charging on/off (Wallbox - Laden)
-        if Unit == 16:
-            pauze_actief = (19 in Devices and Devices[19].nValue == 1)
-
-            if Command == "Off":
-                # UI en state altijd uit
-                self.updateDevice(16, 0, "Off")
-                self.writeRegister(261, 0)
-
-                self.laden_was_actief = False
-                set_state(self.state, "WB_laden_was_actief", 0)
-
-            else:
-                # UI altijd aan, ook als Pauze actief
-                self.updateDevice(16, 1, "On")
-
-                waarde = self._calculate_charge_current()
-
-                # Alleen naar 261 schrijven als Pauze UIT is
-                if not pauze_actief:
-                    self.writeRegister(261, waarde)
-                else:
-                    dbg("Laden aan gezet terwijl Pauze actief is → 261 blijft 0")
-
-                level = max(0, min(100, waarde - 60)) if waarde >= 60 else 0
-                self.saved_level = level
-                self.updateDevice(14, 1 if level > 0 else 0, str(level))
-
-                self.laden_was_actief = True
-                set_state(self.state, "WB_laden_was_actief", 1)
-                set_state(self.state, "WB_slider_level", self.saved_level)
-
+        # Remote lock
+        if Unit == 13:
+            self.writeRegister(259, 0 if Command == "On" else 1)
+            
         # Dimmer (slider)
         elif Unit == 14:
 
-            # Pauze actief → slider mag NIETS doen aan 261
-            if 19 in Devices and Devices[19].nValue == 1:
-                dbg("Slider genegeerd: Pauze actief")
+            # UI-level bepalen
+            level = 0 if Command == "Off" else int(Level)
+            if level <= 2:
+                level = 0
 
-                level = 0 if Command == "Off" else int(Level)
-                if level <= 2:
-                    level = 0
+            # Pauze actief → slider mag UI aanpassen maar NIET naar 261 schrijven
+            if 19 in Devices and Devices[19].nValue == 1:
+                dbg("Slider genegeerd voor 261: Pauze actief")
 
                 self.saved_level = level
                 self.updateDevice(14, 1 if level > 0 else 0, str(level))
                 set_state(self.state, "WB_slider_level", self.saved_level)
                 return
 
-            # Als preset actief was → terug naar dynamisch
+            # Als preset actief was → slider overrult preset → terug naar dynamisch
             if not self.selector_is_dynamic:
                 dbg("Slider gebruikt → preset uit, terug naar dynamisch")
 
@@ -294,90 +267,134 @@ class BasePlugin:
                 self.updateDevice(18, 0, "0")
                 set_state(self.state, "WB_selector_level", 0)
 
-            # Normale slider‑logica
-            level = 0 if Command == "Off" else int(Level)
-            if level <= 2:
-                level = 0
-
+            # Slider UI opslaan
             self.slider_last_change = time.time()
             self.slider_last_level = level
             self.saved_level = level
             set_state(self.state, "WB_slider_level", self.saved_level)
 
+            # UI updaten
             self.updateDevice(14, 1 if level > 0 else 0, str(level))
 
-            if Devices[16].nValue == 0:
-                self.writeRegister(261, 0)
+            # Alleen naar 261 schrijven als: Laden = Aan én Pauze = Uit
+            if Devices[16].nValue == 1 and Devices[19].nValue == 0:
+                waarde = 60 + level if level > 0 else 60
+                dbg(f"Slider → schrijf naar 261: {waarde}")
+                self.writeRegister(261, waarde)
             else:
-                self.writeRegister(261, 60 + level if level > 0 else 60)
+                dbg("Slider wijziging NIET naar 261 — laden uit of pauze actief")
 
-        # Remote lock
-        elif Unit == 13:
-            self.writeRegister(259, 0 if Command == "On" else 1)
+        # Laden Aan/Uit
+        elif Unit == 16:
 
-        # Selector presets
-        elif Unit == 18:
+            dbg(f"Laden commando: {Command}")
 
-            # Pauze actief → presets mogen NIETS doen aan 261
-            if 19 in Devices and Devices[19].nValue == 1:
-                dbg("Preset genegeerd: Pauze actief")
-                selector = 0 if Command == "Off" else int(Level)
-                self.updateDevice(18, 1 if selector > 0 else 0, str(selector))
-                set_state(self.state, "WB_selector_level", selector)
+            # UI bijwerken
+            if Command == "On":
+                self.updateDevice(16, 1, "On")
+            else:
+                self.updateDevice(16, 0, "Off")
+
+            # Laden UIT → altijd 261 = 0
+            if Command == "Off":
+                dbg("Laden uit → schrijf 0 naar 261")
+                self.writeRegister(261, 0)
                 return
 
-            selector = 0 if Command == "Off" else int(Level)
+            # Laden AAN → alleen schrijven als Pauze UIT staat
+            if Devices[19].nValue == 0:
+                level = self.saved_level
+                waarde = 60 + level if level > 0 else 60
+                dbg(f"Laden aan → schrijf naar 261: {waarde}")
+                self.writeRegister(261, waarde)
+            else:
+                dbg("Laden aan maar Pauze actief → NIET naar 261 schrijven")
 
-            self.updateDevice(18, 1 if selector > 0 else 0, str(selector))
+        # Selector (presets)
+        elif Unit == 18:
 
-            if selector == 0:
+            dbg(f"Selector commando: Level={Level}")
+
+            raw_level = int(Level)  # 0,10,20,30,40,50
+
+            # Level 0 = Dynamisch
+            if raw_level == 0:
+                dbg("Selector → Dynamisch gekozen")
+
                 self.selector_is_dynamic = True
                 self.selector_preset_pending = False
                 self.current_selector_level = 0
+
+                self.updateDevice(18, 0, "0")
                 set_state(self.state, "WB_selector_level", 0)
                 return
 
+            # Controleer of level geldig is
+            if raw_level not in self.preset_map:
+                dbg(f"Selector → onbekend level {raw_level}, terug naar Dynamisch")
+                self.selector_is_dynamic = True
+                self.selector_preset_pending = False
+                self.current_selector_level = 0
+                self.updateDevice(18, 0, "0")
+                set_state(self.state, "WB_selector_level", 0)
+                return
+
+            # Vanaf hier: geldige preset
             self.selector_is_dynamic = False
             self.selector_preset_pending = True
-            self.current_selector_level = selector
-            set_state(self.state, "WB_selector_level", selector)
+            self.current_selector_level = raw_level
+            set_state(self.state, "WB_selector_level", raw_level)
 
-            if selector in self.preset_map:
-                waarde = self.preset_map[selector]
+            # >>> DEZE REGEL ONTBREEKT EN IS CRUCIAAL <<<
+            self.updateDevice(18, raw_level, str(raw_level))
 
-                # alleen schrijven als laden aan staat
-                if Devices[16].nValue == 1:
-                    self.writeRegister(261, waarde)
+            desired_261 = self.preset_map[raw_level]
+            ampere = desired_261 / 10.0
 
-                level = max(0, min(100, waarde - 60))
-                self.saved_level = level
-                self.updateDevice(14, 1 if level > 0 else 0, str(level))
-                set_state(self.state, "WB_slider_level", self.saved_level)
+            dbg(f"Selector → preset gekozen: {ampere:.1f}A (level={raw_level}, reg261={desired_261})")
 
-        # Pauze
-        elif Unit == 19:
-            if Command == "On":
-                # Pauze aan → 261 = 0, Laden‑schakelaar NIET bedienen
-                self.updateDevice(19, 1, "On")
-                self.writeRegister(261, 0)
+            slider_level = int((ampere - 6) * (100 / 10))
+            slider_level = max(0, min(100, slider_level))
 
-                # WB variabelen blijven aangeven dat laden actief is
-                if Devices[16].nValue == 1:
-                    self.laden_was_actief = True
-                    set_state(self.state, "WB_laden_was_actief", 1)
+            dbg(f"Selector → slider wordt {slider_level}%")
 
+            self.saved_level = slider_level
+            self.slider_last_level = slider_level
+            set_state(self.state, "WB_slider_level", slider_level)
+
+            self.updateDevice(14, 1 if slider_level > 0 else 0, str(slider_level))
+
+            if Devices[16].nValue == 1 and Devices[19].nValue == 0:
+                dbg(f"Selector → schrijf naar 261: {desired_261}")
+                self.writeRegister(261, desired_261)
             else:
-                # Pauze uit → alleen herstellen als laden aan staat
+                dbg("Selector wijziging NIET naar 261 — laden uit of pauze actief")
+
+        # Pauze Aan/Uit
+        elif Unit == 19:
+
+            dbg(f"Pauze commando: {Command}")
+
+            # UI bijwerken
+            if Command == "On":
+                self.updateDevice(19, 1, "On")
+            else:
                 self.updateDevice(19, 0, "Off")
 
-                if Devices[16].nValue == 1:
-                    waarde = self._calculate_charge_current()
-                    self.writeRegister(261, waarde)
+            # Pauze AAN → altijd 261 = 0
+            if Command == "On":
+                dbg("Pauze aan → schrijf 0 naar 261")
+                self.writeRegister(261, 0)
+                return
 
-                    level = max(0, min(100, waarde - 60))
-                    self.saved_level = level
-                    self.updateDevice(14, 1 if level > 0 else 0, str(level))
-                    set_state(self.state, "WB_slider_level", self.saved_level)
+            # Pauze UIT → alleen schrijven als Laden AAN staat
+            if Devices[16].nValue == 1:
+                level = self.saved_level
+                waarde = 60 + level if level > 0 else 60
+                dbg(f"Pauze uit → schrijf naar 261: {waarde}")
+                self.writeRegister(261, waarde)
+            else:
+                dbg("Pauze uit maar Laden uit → NIET naar 261 schrijven")
 
     # ---------------- Devices ----------------
 
@@ -396,7 +413,7 @@ class BasePlugin:
             11: ("Max HW", 243, 23, 0),
             12: ("Min HW", 243, 23, 0),
             13: ("Vergrendeling", 244, 73, 0),
-            14: ("Laadstroom", 244, 73, 7),
+            14: ("Laadstroom", 244, 11, 7),
             15: ("Communicatie", 244, 73, 0),
             16: ("Laden", 244, 73, 0),
             17: ("Ingestelde laadstroom", 243, 23, 0),
@@ -450,48 +467,8 @@ class BasePlugin:
         if level <= 5:
             level = 0
 
-        if self.selector_is_dynamic and level == 0:
-            if Devices[16].nValue != 0:
-                self.writeRegister(261, 60)
-            else:
-                self.writeRegister(261, 0)
-            self.updateDevice(14, 0, "0")
-
         self.slider_last_change = 0
         self.slider_last_level = None
-
-    def updateSelectorFrom261(self, val):
-        """Sync selector UI with register 261 value."""
-        if self.selector_is_dynamic:
-            return
-
-        if self.selector_preset_pending:
-            if self.current_selector_level in self.preset_map:
-                expected = self.preset_map[self.current_selector_level]
-                if val == expected:
-                    self.selector_preset_pending = False
-            return
-
-        if val <= 59:
-            return
-
-        mapping = {
-            60: 10,
-            80: 20,
-            100: 30,
-            130: 40,
-            160: 50,
-        }
-
-        if val in mapping:
-            level = mapping[val]
-        else:
-            level = 0
-
-        self.updateDevice(18, 1 if level > 0 else 0, str(level))
-        self.current_selector_level = level
-        self.selector_is_dynamic = (level == 0)
-        set_state(self.state, "WB_selector_level", self.current_selector_level)
 
     def startupRecovery(self):
         """One-time startup recovery from persistent state."""
@@ -667,26 +644,9 @@ class BasePlugin:
                 if val_261 != 0:
                     self.writeRegister(261, 0)
                 # Geen updateDevice(16, ...) hier: Pauze mag Laden niet sturen
-            else:
-                # Normale sync van Wallbox - Laden met 261
-                is_charging = val_261 > 59
-                self.updateDevice(16, 1 if is_charging else 0,
-                                  "On" if is_charging else "Off")
 
             # Communication OK
             self.updateDevice(15, 1, "On")
-
-            # Sync selector and slider UI from register 261
-            self.updateSelectorFrom261(val_261)
-
-            # Pauze actief → slider UI NIET aanpassen
-            if pauze_actief:
-                dbg("Slider UI sync overgeslagen: Pauze actief")
-            else:
-                level = max(0, min(100, val_261 - 60)) if val_261 >= 60 else 0
-                self.saved_level = level
-                self.updateDevice(14, 1 if level > 0 else 0, str(level))
-                set_state(self.state, "WB_slider_level", self.saved_level)
 
             # Dimmer-settle
             self.handleSliderSettle()
