@@ -1,7 +1,7 @@
 """
 <plugin key="heidelberg-wallbox"
         name="Heidelberg Amperfied Wallbox"
-        author="Christian"
+        author="XtremerNL"
         version="0.9.26">
     <params>
         <param field="Address" label="IP-adres wallbox" width="200px" required="true"/>
@@ -720,3 +720,4 @@ def onCommand(Unit, Command, Level, Color):
 def onHeartbeat():
     """Domoticz heartbeat callback (unused)."""
     pass
+
