@@ -1,6 +1,21 @@
 CHANGELOG — Heidelberg Amperfied Wallbox Domoticz Plugin
 Auteur: Xtremernl
 
+0.9.26 – RS485 stabiliteitsupdate
+Deze release verhelpt de write‑errors die konden optreden bij gebruik van een TCP→RS485‑converter op 19200 baud.
+De wallbox accepteert maar één Modbus‑RTU transactie tegelijk; snelle of overlappende reads/writes veroorzaakten busconflicten, timeouts en socketfouten.
+Daarom is de Modbus‑communicatie nu volledig gesynchroniseerd en baudrate‑veilig gemaakt.
+
+• Globale Modbus‑lock toegevoegd, 
+Alle Modbus‑reads en ‑writes worden nu sequentieel uitgevoerd via één threading.Lock().
+• 150 ms write‑debounce toegevoegd, 
+writeRegister() wacht nu minimaal 150 ms tussen opeenvolgende writes om overlappende RTU‑frames te voorkomen.
+• Alle reads in pollWallbox() onder dezelfde lock geplaatst, 
+Elke read_input_block() en read_holding_single() draait nu binnen with self.modbus_lock:.
+• Socket‑recovery toegevoegd aan writeRegister(), 
+Bij een write‑fout wordt de TCP‑socket direct gesloten zodat de converter niet in een half‑open state blijft hangen.
+
+
 0.9.25 – interne stabiliteitsrelease
 • 	Volledige herbouw van de laadlogica: UI‑leidend, geen poll‑interferentie.
 • 	Verbeterde selector/slider‑consistentie en correcte UI‑feedback.
