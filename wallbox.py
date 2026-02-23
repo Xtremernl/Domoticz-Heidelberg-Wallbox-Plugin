@@ -1,7 +1,7 @@
 """
 Modbus TCP client for Heidelberg Amperfied Wallbox.
 
-Author: Christian Jacobs
+Author: XtremerNL
 Version: 0.9.20
 """
 
@@ -180,4 +180,5 @@ class HeidelbergWallbox:
 
         r_addr, r_val = struct.unpack(">HH", resp[1:5])
         if r_addr != addr or r_val != value:
+
             raise IOError("Write echo mismatch")
