@@ -2,7 +2,7 @@
 <plugin key="heidelberg-wallbox"
         name="Heidelberg Amperfied Wallbox"
         author="Christian"
-        version="0.9.25">
+        version="0.9.26">
     <params>
         <param field="Address" label="IP-adres wallbox" width="200px" required="true"/>
         <param field="Port" label="Modbus TCP poort" width="100px" required="true" default="502"/>
@@ -123,6 +123,9 @@ class BasePlugin:
         self.firstPollDone = False
         self.last_update = {}
         self.error_count = 0
+        self.modbus_lock = threading.Lock()
+        self.last_write_time = 0
+
 
         # Slider settle state
         self.slider_last_change = 0
@@ -199,7 +202,7 @@ class BasePlugin:
 
     def onStart(self):
         """Start plugin and polling thread."""
-        Domoticz.Log("Wallbox plugin 0.9.25 started.")
+        Domoticz.Log("Wallbox plugin 0.9.26 started.")
 
         self.ip = Parameters["Address"]
         self.port = int(Parameters["Port"])
@@ -557,7 +560,9 @@ class BasePlugin:
     def pollWallbox(self):
         """Poll wallbox and update devices."""
         try:
-            regs = self.hw.read_input_block(5, 10)
+            with self.modbus_lock:
+                regs = self.hw.read_input_block(5, 10)
+
             status = regs[0]
             self.last_status = status
             set_state(self.state, "WB_auto_was_status", status)
@@ -587,7 +592,9 @@ class BasePlugin:
 
             # External lock
             try:
-                val_13 = self.hw.read_input_block(13, 1)[0]
+                with self.modbus_lock:
+                    val_13 = self.hw.read_input_block(13, 1)[0]
+
                 locked = val_13 == 0
                 self.updateDevice(9, 1 if locked else 0,
                                   "Locked" if locked else "Released")
@@ -596,7 +603,9 @@ class BasePlugin:
 
             # Remote lock (register 259)
             try:
-                val_259 = self.hw.read_holding_single(259)
+                with self.modbus_lock:
+                    val_259 = self.hw.read_holding_single(259)
+
                 locked = val_259 == 0
                 self.updateDevice(13, 1 if locked else 0,
                                   "On" if locked else "Off")
@@ -604,7 +613,9 @@ class BasePlugin:
                 pass
 
             # Energy and power
-            regs2 = self.hw.read_input_block(17, 2)
+            with self.modbus_lock:
+                regs2 = self.hw.read_input_block(17, 2)
+
             energy = (regs2[0] << 16) + regs2[1]
             power = regs[9]
 
@@ -612,12 +623,16 @@ class BasePlugin:
             self.updateDevice(10, 0, f"{power};{energy:.3f}")
 
             # Max/min HW current
-            regs3 = self.hw.read_input_block(100, 2)
+            with self.modbus_lock:
+                regs3 = self.hw.read_input_block(100, 2)
+
             self.updateDevice(11, 0, str(regs3[0]))
             self.updateDevice(12, 0, str(regs3[1]))
 
             # Register 261 (for UI/sync only)
-            val_261 = self.hw.read_holding_single(261)
+            with self.modbus_lock:
+                val_261 = self.hw.read_holding_single(261)
+
             self.last_261_value = val_261
 
             # Stable status counter for startup recovery
@@ -664,11 +679,26 @@ class BasePlugin:
                 self.error_count = 0
 
     def writeRegister(self, reg, value):
-        """Write value to Modbus holding register."""
+        """Write value to Modbus holding register with lock + debounce."""
         try:
-            self.hw.write_holding_single(reg, value)
+            with self.modbus_lock:
+                now = time.time()
+
+                # Debounce: minimaal 150ms tussen writes
+                if now - self.last_write_time < 0.15:
+                    time.sleep(0.15 - (now - self.last_write_time))
+
+                self.last_write_time = time.time()
+
+                self.hw.write_holding_single(reg, value)
+
         except Exception as e:
             Domoticz.Error(f"Write error reg {reg}: {e}")
+            try:
+                self.hw._close_socket()
+            except:
+                pass
+
 
 
 global _plugin
